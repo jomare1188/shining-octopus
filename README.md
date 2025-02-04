@@ -54,7 +54,7 @@ Sb3   0    0    0    # Sb3 connects to Sb1
 Comparing the original sorghum network with the mapped edges matrix, we can see which edges are conserved:
 - Sb1-Sb2: Conserved (exists in both matrices)
 - Sb2-Sb3: Not conserved (exists in sorghum but not in mapped edges)
-- Sb1-Sb3: Not exist in sorghum network, cant be conserved
+- Sb1-Sb3: Does not  exist in sorghum network, neither sugarcane network
 
 A `TRUE` (1) in the mapped edges matrix indicates that the corresponding sorghum genes have at least one pair of their orthologs connected in the sugarcane network. This demonstrates how the matrix multiplication approach can identify both conserved edges and potential new connections through ortholog relationships.
 

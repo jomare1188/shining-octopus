@@ -43,18 +43,18 @@ Sc3    0     1    0    0    # Sc3 connects to Sc1B
 ```
 
 #### Step 3: Matrix Multiplication Result
-The operation `(ortholog_matrix %*% sugarcane_matrix %*% t(ortholog_matrix)) > 0` yields:
+The operation `(ortholog_matrix %*% sugarcane_matrix %*% t(ortholog_matrix))` yields:
 ```
      Sb1  Sb2  Sb3
-Sb1   0    1    1    # Sb1 connects to Sb2 and Sb3
+Sb1   2    1    0    # Sb1 connects to Sb2 and Sb3
 Sb2   1    0    0    # Sb2 connects to Sb1
-Sb3   1    0    0    # Sb3 connects to Sb1
+Sb3   0    0    0    # Sb3 connects to Sb1
 ```
 
 Comparing the original sorghum network with the mapped edges matrix, we can see which edges are conserved:
 - Sb1-Sb2: Conserved (exists in both matrices)
 - Sb2-Sb3: Not conserved (exists in sorghum but not in mapped edges)
-- Sb1-Sb3: New connection found through ortholog mapping (doesn't exist in sorghum but found in sugarcane through orthologs)
+- Sb1-Sb3: Not exist in sorghum network, cant be conserved
 
 A `TRUE` (1) in the mapped edges matrix indicates that the corresponding sorghum genes have at least one pair of their orthologs connected in the sugarcane network. This demonstrates how the matrix multiplication approach can identify both conserved edges and potential new connections through ortholog relationships.
 

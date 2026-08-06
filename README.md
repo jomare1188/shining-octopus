@@ -46,15 +46,16 @@ Sc3    0     1    0    0    # Sc3 connects to Sc1B
 The operation `(ortholog_matrix %*% sugarcane_matrix %*% t(ortholog_matrix))` yields:
 ```
      Sb1  Sb2  Sb3
-Sb1   2    1    0    # Sb1 connects to Sb2 and Sb3
-Sb2   1    0    0    # Sb2 connects to Sb1
-Sb3   0    0    0    # Sb3 connects to Sb1
+Sb1   0    2    1    # Sb1-Sb2 via Sc1A-Sc2 and Sc1B-Sc2; Sb1-Sb3 via Sc1B-Sc3
+Sb2   2    0    0
+Sb3   1    0    0
 ```
+Each entry counts the sugarcane edges running between any ortholog of one sorghum gene and any ortholog of the other, so the entry for Sb1-Sb2 is 2: both of Sb1's orthologs happen to connect to Sc2.
 
 Comparing the original sorghum network with the mapped edges matrix, we can see which edges are conserved:
-- Sb1-Sb2: Conserved (exists in both matrices)
-- Sb2-Sb3: Not conserved (exists in sorghum but not in mapped edges)
-- Sb1-Sb3: Does not  exist in sorghum network, neither sugarcane network
+- Sb1-Sb2: Conserved (present in sorghum, and the orthologs are connected in sugarcane)
+- Sb2-Sb3: Not conserved (present in sorghum, but Sc2 and Sc3 are not connected in sugarcane)
+- Sb1-Sb3: Absent from sorghum, but the orthologs Sc1B and Sc3 *are* connected — an edge the projection reveals rather than a conserved one
 
 A `TRUE` (1) in the mapped edges matrix indicates that the corresponding sorghum genes have at least one pair of their orthologs connected in the sugarcane network. This demonstrates how the matrix multiplication approach can identify both conserved edges and potential new connections through ortholog relationships.
 
@@ -75,6 +76,8 @@ Two network files are required:
   - Sorghum: `networks/abs_triplets_p60_sorghum_fancy.tsv`
   - Sugarcane: `networks/abs_triplets_p60_cane_fancy.tsv`
 
+The networks are undirected, and each edge is expected to appear once. `build_adjacency()` fills both orientations so the adjacency matrices are symmetric; otherwise the results would depend on the order genes happen to be listed in.
+
 ## Usage
 ```R
 # Read and process ortholog relationships
@@ -94,4 +97,18 @@ jaccard_index <- calculate_jaccard(results)
 ```
 
 ## Output
-The code returns a data frame of conserved edges and calculates a Jaccard index measuring network similarity. The Jaccard index ranges from 0 (no similarity) to 1 (identical networks), providing a quantitative measure of network conservation between species.
+The code returns a data frame of conserved edges and calculates a similarity score ranging from 0 (no similarity) to 1 (every edge conserved), providing a quantitative measure of network conservation between species.
+
+Note that `calculate_jaccard()` divides by the edge count of the query network rather than by the size of the union, so it is a containment (overlap) coefficient rather than a Jaccard index, and it is asymmetric — which is why `process_networks_bidirectional()` reports it in both directions.
+
+## Repository layout
+- `edge_conservation.r` — matrix construction and the ortholog projection; depends on `Matrix` alone
+- `shared_edges.r` — the full pipeline over OrthoFinder output and network files
+- `simple_code.r` — the worked example above, as runnable code
+- `test_edge_conservation.r` — regression tests
+
+## Tests
+```bash
+Rscript test_edge_conservation.r
+```
+Requires only `Matrix`. Run from the repository root.

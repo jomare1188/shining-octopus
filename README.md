@@ -79,21 +79,38 @@ Two network files are required:
 The networks are undirected, and each edge is expected to appear once. `build_adjacency()` fills both orientations so the adjacency matrices are symmetric; otherwise the results would depend on the order genes happen to be listed in.
 
 ## Usage
+
+The species names must match the orthogroups file exactly, so start by listing them:
+
+```bash
+Rscript shared_edges.r --orthogroups path/to/Orthogroups.tsv --list-species
+```
+
+Then run the comparison:
+
+```bash
+Rscript shared_edges.r \
+    --orthogroups path/to/Orthogroups.tsv \
+    --network-a   path/to/sorghum_network.tsv \
+    --network-b   path/to/sugarcane_network.tsv \
+    --species-a   sorghum_protein_of_longest_cds_per_orthogroup \
+    --species-b   sugarcane_proteins_of_longest_cds_per_OG \
+    --outdir      results/
+```
+
+This writes `classification_edges_<species>.csv` for each species — the input edge list with a `conserved` column — and prints the conserved fraction in both directions.
+
+`--gene-suffix` is the one option worth understanding. OrthoFinder runs on proteins while the networks are built on genes, so the identifiers usually differ by an isoform suffix. The default `\.p[0-9]+$` strips `.p1` from `Sobic.001G000100.p1`; pass a different regex, or `''` to disable. If the two identifier sets end up with nothing in common the run stops and prints an example of each, rather than silently reporting zero conservation.
+
+See `--help` for the full list.
+
+### As a library
+
 ```R
-# Read and process ortholog relationships
-orthologues <- read_orthogroups("path/to/Orthogroups.tsv")
+source("shared_edges.r")   # exposes the functions without running anything
 
-# Read network files
-adjacency_sorghum <- read_tsv("path/to/sorghum_network.tsv",
-                             col_names = c("gene1", "gene2", "weight"))
-adjacency_sugarcane <- read_tsv("path/to/sugarcane_network.tsv",
-                               col_names = c("gene1", "gene2", "weight"))
-
-# Process networks and calculate Jaccard index
-results <- process_networks_matrix(adjacency_sorghum, 
-                                 adjacency_sugarcane, 
-                                 ortholog_pairs)
-jaccard_index <- calculate_jaccard(results)
+results <- process_networks_matrix(edges_a, edges_b, ortholog_pairs)
+score <- calculate_jaccard(results)
 ```
 
 ## Output

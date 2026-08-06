@@ -24,6 +24,7 @@ dependencies:
   - r-matrix
   - r-igraph
   - r-tidyverse
+  - r-optparse
   - bioconductor-cogeqc
 
   # --- transcript quantification import ---

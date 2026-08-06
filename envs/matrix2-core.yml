@@ -27,4 +27,5 @@ dependencies:
   - r-matrix          # sparse adjacency and ortholog matrices - the method core
   - r-igraph          # network handling
   - r-tidyverse       # readr, dplyr, tidyr, tibble, ggplot2
+  - r-optparse        # command line interface of shared_edges.r
   - bioconductor-cogeqc   # read_orthogroups() for OrthoFinder output

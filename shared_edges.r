@@ -1,10 +1,13 @@
-library(readr)
-library(igraph)
-library(Matrix)
-library(dplyr)
-library(tidyr)
-library(tibble)
-library(cogeqc)
+suppressPackageStartupMessages({
+    library(readr)
+    library(igraph)
+    library(Matrix)
+    library(dplyr)
+    library(tidyr)
+    library(tibble)
+    library(cogeqc)
+    library(optparse)
+})
 
 # Matrix construction and the ortholog projection live here; sourced relative
 # to the working directory, so run this script from the repository root.
@@ -27,12 +30,14 @@ process_networks_matrix <- function(sorghum_edges, sugarcane_edges, ortholog_pai
         ortholog_pairs$sugarcane_gene  # Include genes from ortholog pairs
     ))
 
-    # Add diagnostic prints
-    cat("Number of unique sorghum genes in edges:",
+    # Add diagnostic prints. The gap between the first two numbers is the
+    # orthology coverage of the network: edges whose endpoints have no ortholog
+    # can never be counted as conserved.
+    cat("  genes in the query network:      ",
         length(unique(c(sorghum_edges$gene1, sorghum_edges$gene2))), "\n")
-    cat("Number of unique sorghum genes in orthologs:",
+    cat("  query genes with an ortholog:    ",
         length(unique(ortholog_pairs$sorghum_gene)), "\n")
-    cat("Total unique sorghum genes after combining:",
+    cat("  union used for the matrix:       ",
         length(sorghum_genes), "\n")
 
     # Create gene to index mappings
@@ -128,47 +133,187 @@ process_networks_bidirectional <- function(sorghum_edges, sugarcane_edges, ortho
 }
 
 ###########################################
-# Example run
+# Inputs
 ###########################################
 
-# Wrapped in main() and guarded below so that sourcing this file exposes the
-# functions without reading the hard-coded input paths or writing any output.
-main <- function() {
-    # Read and preprocess data as in original code
-    orthologues <- read_orthogroups("/home/dmpachon/jorge/comparative_cane/results/orthofinder/Results_Aug30/Orthogroups/Orthogroups.tsv")
-    orthologues$Gene <- sub("\\.p[0-9]+$", "", orthologues$Gene)
-    orthologues$Species <- recode(orthologues$Species,
-        maize_GCF_902167145.1_Zm.B73.REFERENCE.NAM.5.0_protein = "maize",
-        rice_GCF_034140825.1_ASM3414082v1_protein = "rice",
-        sorghum_protein_of_longest_cds_per_orthogroup = "sorghum",
-        sugarcane_proteins_of_longest_cds_per_OG = "sugarcane"
-    )
+read_network <- function(path) {
+    read_tsv(path, col_names = c("gene1", "gene2", "weight"),
+             col_types = cols(gene1 = col_character(),
+                              gene2 = col_character(),
+                              weight = col_double()))
+}
 
-    edges_sorghum <- read_tsv("../results/networks/abs_triplets_p60_sorghum_fancy.tsv",
-                                 col_names = c("gene1", "gene2", "weight"))
-    edges_sugarcane <- read_tsv("../results/networks/abs_triplets_p60_cane_fancy.tsv",
-                                   col_names = c("gene1", "gene2", "weight"))
-
-    # Create ortholog pairs as in original code
-    sorghum_orthologues <- orthologues %>%
-        filter(Species == "sorghum") %>%
+# Ortholog pairs between two species of the orthogroups table.
+#
+# NOTE: the sorghum_gene / sugarcane_gene column names are positional slots
+# inherited from the original sorghum-vs-sugarcane script, not a claim about
+# which species is which - sorghum_gene holds species_a and sugarcane_gene
+# holds species_b whatever they are. Renaming them throughout would be clearer
+# and is worth doing separately.
+build_ortholog_pairs <- function(orthologues, species_a, species_b) {
+    genes_a <- orthologues %>%
+        filter(Species == species_a) %>%
         select(Orthogroup, sorghum_gene = Gene)
 
-    sugarcane_orthologues <- orthologues %>%
-        filter(Species == "sugarcane") %>%
+    genes_b <- orthologues %>%
+        filter(Species == species_b) %>%
         select(Orthogroup, sugarcane_gene = Gene)
 
-    ortholog_pairs <- sorghum_orthologues %>%
-        inner_join(sugarcane_orthologues, by = "Orthogroup")
+    inner_join(genes_a, genes_b, by = "Orthogroup")
+}
 
-    results <- process_networks_bidirectional(edges_sorghum, edges_sugarcane, ortholog_pairs)
+###########################################
+# Command line interface
+###########################################
 
-    # write in files the classified edges
-    edges_sorghum <- results$edges_sorghum
-    edges_sugarcane <- results$edges_sugarcane
+parse_arguments <- function(args = commandArgs(trailingOnly = TRUE)) {
+    option_list <- list(
+        make_option("--orthogroups", type = "character", default = NULL,
+                    help = "OrthoFinder Orthogroups.tsv [required]"),
+        make_option("--network-a", type = "character", default = NULL,
+                    dest = "network_a",
+                    help = paste("Edge list of the first species, tab separated,",
+                                 "columns gene1 gene2 weight, no header [required]")),
+        make_option("--network-b", type = "character", default = NULL,
+                    dest = "network_b",
+                    help = "Edge list of the second species [required]"),
+        make_option("--species-a", type = "character", default = NULL,
+                    dest = "species_a",
+                    help = paste("Name of the first species exactly as it appears in the",
+                                 "orthogroups file; see --list-species [required]")),
+        make_option("--species-b", type = "character", default = NULL,
+                    dest = "species_b",
+                    help = "Name of the second species [required]"),
+        make_option("--outdir", type = "character", default = ".",
+                    help = "Directory for the classified edge tables [default %default]"),
+        make_option("--gene-suffix", type = "character", default = "\\.p[0-9]+$",
+                    dest = "gene_suffix",
+                    help = paste("Regex stripped from gene IDs in the orthogroups file, to",
+                                 "reconcile protein IDs with the gene IDs used in the",
+                                 "networks. Pass '' to disable. [default %default]")),
+        make_option("--list-species", action = "store_true", default = FALSE,
+                    dest = "list_species",
+                    help = "Print the species found in the orthogroups file and exit")
+    )
 
-    write.csv(edges_sorghum, "classification_edges_sorghum.csv", quote = F, row.names = F)
-    write.csv(edges_sugarcane, "classification_edges_sugarcane.csv", quote = F, row.names = F)
+    parse_args(OptionParser(
+        option_list = option_list,
+        usage = paste("usage: %prog --orthogroups FILE --network-a FILE --network-b FILE",
+                      "--species-a NAME --species-b NAME [options]")),
+        args = args)
+}
+
+require_options <- function(opt, names) {
+    missing <- names[vapply(names, function(n) is.null(opt[[n]]), logical(1))]
+    if (length(missing) > 0) {
+        stop("missing required argument(s): ",
+             paste0("--", gsub("_", "-", missing), collapse = ", "),
+             "\nrun with --help for usage", call. = FALSE)
+    }
+}
+
+# Species names come from the orthogroups column headers and are often long
+# filenames, so they cannot be dropped into a path unescaped.
+safe_filename <- function(x) gsub("[^A-Za-z0-9._-]+", "_", x)
+
+# Report how much of a network the orthogroups file actually covers, and refuse
+# to run if the two use different identifier conventions.
+#
+# This is the failure mode worth being loud about: OrthoFinder runs on proteins
+# and the networks are built on genes, so the IDs routinely differ by an isoform
+# suffix. Nothing downstream errors when they do not match - every edge simply
+# fails to find an ortholog and the conservation score comes out a clean, silent
+# zero, which reads as a biological result rather than a configuration mistake.
+check_id_overlap <- function(edges, ortholog_genes, species, gene_suffix) {
+    network_genes <- unique(c(edges$gene1, edges$gene2))
+    shared <- intersect(network_genes, unique(ortholog_genes))
+
+    cat(sprintf("  %s: %d of %d network genes have an ortholog (%.1f%%)\n",
+                species, length(shared), length(network_genes),
+                100 * length(shared) / length(network_genes)))
+
+    if (length(shared) == 0) {
+        stop("no gene IDs are shared between the ", species, " network and the ",
+             "orthogroups file.\n",
+             "  network IDs look like:    ",
+             paste(utils::head(network_genes, 3), collapse = ", "), "\n",
+             "  orthogroup IDs look like: ",
+             paste(utils::head(unique(ortholog_genes), 3), collapse = ", "), "\n",
+             "  --gene-suffix is currently '", gene_suffix, "'; it is stripped from ",
+             "the orthogroup IDs to reconcile the two.", call. = FALSE)
+    }
+
+    invisible(length(shared))
+}
+
+###########################################
+# Entry point
+###########################################
+
+main <- function(opt = parse_arguments()) {
+    require_options(opt, "orthogroups")
+
+    orthologues <- read_orthogroups(opt$orthogroups)
+
+    # read_orthogroups() returns Species as a factor. Left as one, cat() prints
+    # its integer codes rather than the species names, and any comparison
+    # against a name not in the levels is a warning-free NA.
+    orthologues$Species <- as.character(orthologues$Species)
+
+    if (nzchar(opt$gene_suffix)) {
+        orthologues$Gene <- sub(opt$gene_suffix, "", orthologues$Gene)
+    }
+
+    available_species <- sort(unique(orthologues$Species))
+
+    if (opt$list_species) {
+        cat(available_species, sep = "\n")
+        return(invisible(available_species))
+    }
+
+    require_options(opt, c("network_a", "network_b", "species_a", "species_b"))
+
+    unknown <- setdiff(c(opt$species_a, opt$species_b), available_species)
+    if (length(unknown) > 0) {
+        stop("species not found in ", opt$orthogroups, ": ",
+             paste(unknown, collapse = ", "),
+             "\navailable: ", paste(available_species, collapse = ", "), call. = FALSE)
+    }
+
+    ortholog_pairs <- build_ortholog_pairs(orthologues, opt$species_a, opt$species_b)
+    if (nrow(ortholog_pairs) == 0) {
+        stop("no orthogroup contains both ", opt$species_a, " and ", opt$species_b,
+             call. = FALSE)
+    }
+    cat("Ortholog pairs:", nrow(ortholog_pairs), "\n")
+
+    edges_a <- read_network(opt$network_a)
+    edges_b <- read_network(opt$network_b)
+
+    cat("Orthology coverage\n")
+    check_id_overlap(edges_a, ortholog_pairs$sorghum_gene, opt$species_a, opt$gene_suffix)
+    check_id_overlap(edges_b, ortholog_pairs$sugarcane_gene, opt$species_b, opt$gene_suffix)
+    cat("\n")
+
+    results <- process_networks_bidirectional(edges_a, edges_b, ortholog_pairs)
+
+    cat("\nConserved fraction",
+        "\n  ", opt$species_a, " -> ", opt$species_b, ": ",
+        format(results$sorghum_to_sugarcane, digits = 4),
+        "\n  ", opt$species_b, " -> ", opt$species_a, ": ",
+        format(results$sugarcane_to_sorghum, digits = 4), "\n", sep = "")
+
+    dir.create(opt$outdir, showWarnings = FALSE, recursive = TRUE)
+    out_a <- file.path(opt$outdir,
+                       paste0("classification_edges_", safe_filename(opt$species_a), ".csv"))
+    out_b <- file.path(opt$outdir,
+                       paste0("classification_edges_", safe_filename(opt$species_b), ".csv"))
+
+    write.csv(results$edges_sorghum, out_a, quote = FALSE, row.names = FALSE)
+    write.csv(results$edges_sugarcane, out_b, quote = FALSE, row.names = FALSE)
+    cat("\nWrote ", out_a, "\n      ", out_b, "\n", sep = "")
+
+    invisible(results)
 }
 
 # Runs only under `Rscript shared_edges.r`; sourcing the file does not trigger it.

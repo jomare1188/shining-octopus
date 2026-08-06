@@ -1,0 +1,30 @@
+# Everything needed to run the method in this repository: shared_edges.r,
+# simple_code.r and test_edge_conservation.r.
+#
+# Deliberately small so it solves in a couple of minutes. If you are working on
+# real expression data, use matrix2-expression.yml instead - it is a superset.
+#
+#     mamba env create -f envs/matrix2-core.yml
+#     conda activate matrix2-core
+#     Rscript test_edge_conservation.r
+
+name: matrix2-core
+
+channels:
+  - conda-forge
+  - bioconda
+  # Keeps Anaconda's `defaults` channel out of the solve. It is not just a
+  # licensing question: defaults ships its own r-base builds, and a solver free
+  # to mix them with conda-forge's produces environments where bioconductor
+  # packages fail to load.
+  - nodefaults
+
+dependencies:
+  # R 4.5 is pinned because every bioconductor package below is built against a
+  # specific R minor version (the r45 build tag); mixing them does not resolve.
+  - r-base=4.5
+
+  - r-matrix          # sparse adjacency and ortholog matrices - the method core
+  - r-igraph          # network handling
+  - r-tidyverse       # readr, dplyr, tidyr, tibble, ggplot2
+  - bioconductor-cogeqc   # read_orthogroups() for OrthoFinder output

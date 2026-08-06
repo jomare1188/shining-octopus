@@ -1,0 +1,45 @@
+# Superset of matrix2-core, adding the differential expression, transcript
+# import and GO enrichment stack needed to test the method on real data.
+#
+# It is a superset on purpose: quantification -> DE -> network -> conservation
+# -> enrichment is one continuous analysis, and switching environments halfway
+# through is how sessionInfo() ends up disagreeing with itself.
+#
+#     mamba env create -f envs/matrix2-expression.yml
+#     conda activate matrix2-expression
+
+name: matrix2-expression
+
+channels:
+  - conda-forge
+  - bioconda
+  # See matrix2-core.yml: keeps Anaconda's `defaults` channel out of the solve.
+  - nodefaults
+
+dependencies:
+  # See the note in matrix2-core.yml: the bioconductor build tags pin R.
+  - r-base=4.5
+
+  # --- method core (same as matrix2-core.yml) ---
+  - r-matrix
+  - r-igraph
+  - r-tidyverse
+  - bioconductor-cogeqc
+
+  # --- transcript quantification import ---
+  - bioconductor-tximport
+  - r-jsonlite            # tximport reads salmon/kallisto run metadata
+  - r-readr               # tximport's fast import path
+
+  # --- differential expression ---
+  - bioconductor-deseq2
+  - bioconductor-edger
+  - bioconductor-apeglm   # lfcShrink(type = "apeglm")
+
+  # --- GO enrichment ---
+  - bioconductor-topgo
+  - bioconductor-go.db
+  - bioconductor-annotationdbi
+
+  # --- general ---
+  - r-data.table          # large count matrices load far faster than read.csv

@@ -106,6 +106,14 @@ Note that `calculate_jaccard()` divides by the edge count of the query network r
 - `shared_edges.r` — the full pipeline over OrthoFinder output and network files
 - `simple_code.r` — the worked example above, as runnable code
 - `test_edge_conservation.r` — regression tests
+- `envs/` — conda environments; see [envs/README.md](envs/README.md)
+
+## Setup
+```bash
+mamba env create -f envs/matrix2-core.yml
+conda activate matrix2-core
+```
+Use `envs/matrix2-expression.yml` instead when working with real expression data — it adds DESeq2, edgeR, tximport and topGO.
 
 ## Tests
 ```bash

@@ -1,11 +1,15 @@
 library(Matrix)
 
+# NOTE: byrow = TRUE is required throughout. Matrix() fills column-wise by
+# default, which silently transposes the ortholog matrix relative to the layout
+# the comments describe.
+
 # Create the ortholog matrix (3 sorghum genes × 4 sugarcane genes)
 ortholog_matrix <- Matrix(c(
     1, 1, 0, 0,  # Sb1 -> Sc1A, Sc1B
     0, 0, 1, 0,  # Sb2 -> Sc2
     0, 0, 0, 1   # Sb3 -> Sc3
-), nrow=3, sparse=TRUE)
+), nrow=3, sparse=TRUE, byrow=TRUE)
 
 # Create sugarcane adjacency matrix (4×4)
 sugarcane_matrix <- Matrix(c(
@@ -13,14 +17,14 @@ sugarcane_matrix <- Matrix(c(
     0, 0, 1, 1,  # Sc1B -> Sc2, Sc3
     1, 1, 0, 0,  # Sc2 -> Sc1A, Sc1B
     0, 1, 0, 0   # Sc3 -> Sc1B
-), nrow=4, sparse=TRUE)
+), nrow=4, sparse=TRUE, byrow=TRUE)
 
 # Create sorghum adjacency matrix (3×3)
 sorghum_matrix <- Matrix(c(
     0, 1, 0,  # Sb1 -> Sb2
     1, 0, 1,  # Sb2 -> Sb1, Sb3
     0, 1, 0   # Sb3 -> Sb2
-), nrow=3, sparse=TRUE)
+), nrow=3, sparse=TRUE, byrow=TRUE)
 
 # Add row and column names for better visualization
 rownames(ortholog_matrix) <- c("Sb1", "Sb2", "Sb3")
@@ -60,3 +64,8 @@ print(sorghum_matrix > 0)
 cat("\nConserved Edges (edges present in both networks):\n")
 conserved <- (mapped_edges & (sorghum_matrix > 0))
 print(conserved)
+
+# Edges the projection reveals that sorghum does not have: the orthologs are
+# connected in sugarcane, but the sorghum genes themselves are not.
+cat("\nOrtholog-implied Edges (in the mapped matrix, absent from sorghum):\n")
+print(mapped_edges & !(sorghum_matrix > 0))
